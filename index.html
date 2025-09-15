@@ -44,7 +44,7 @@
 
     <section>
         <article><h1>geotiff.js</h1>
-<p><a href="https://travis-ci.org/geotiffjs/geotiff.js"><img src="https://travis-ci.org/geotiffjs/geotiff.js.svg" alt="Build Status"></a> <a href="https://badge.fury.io/js/geotiff"><img src="https://badge.fury.io/js/geotiff.svg" alt="npm version"></a> <a href="https://gitter.im/geotiffjs/Lobby"><img src="https://badges.gitter.im/geotiffjs/geotiff.js.png" alt="Gitter chat"></a></p>
+<p><a href="https://github.com/geotiffjs/geotiff.js/actions/workflows/ci.yml"><img src="https://github.com/geotiffjs/geotiff.js/actions/workflows/ci.yml/badge.svg?branch=master" alt="Node.js CI"></a> <a href="https://badge.fury.io/js/geotiff"><img src="https://badge.fury.io/js/geotiff.svg" alt="npm version"></a> <a href="https://gitter.im/geotiffjs/Lobby"><img src="https://badges.gitter.im/geotiffjs/geotiff.js.png" alt="Gitter chat"></a></p>
 <p>Read (geospatial) metadata and raw array data from a wide variety of different
 (Geo)TIFF files types.</p>
 <h2>Features</h2>
@@ -70,7 +70,8 @@
 <li>Supported data-types:
 <ul>
 <li>(U)Int8/16/32</li>
-<li>Float32/64</li>
+<li>UInt1-31 (with some drawbacks)</li>
+<li>Float16/32/64</li>
 </ul>
 </li>
 <li>Enabled compressions:
@@ -80,6 +81,9 @@
 <li>LZW</li>
 <li>Deflate (with floating point or horizontal predictor support)</li>
 <li>JPEG</li>
+<li>LERC (with additional Deflate compression support)</li>
+<li>Zstandard</li>
+<li>image formats supported via the browser (such as WebP)</li>
 </ul>
 </li>
 <li>Automatic selection of overview level to read from</li>
@@ -93,6 +97,58 @@
 </ul>
 <p>Further documentation can be found <a href="https://geotiffjs.github.io/geotiff.js/">here</a>.</p>
 <h2>Example Usage</h2>
+<p>Geotiff gives you access to all GeoTIFF metadata, but does not offer any one specific higher level API (such as GDAL) for things like transforms or data extraction. However, you can write your own higher level API using this library, given your specific dataset needs.</p>
+<p>As an example, here is how you would resolve GPS coordinates to elevation in a GeoTIFF that encodes WGS-84 compliant geo data:</p>
+<pre class="prettyprint source lang-js"><code>import { fromUrl, fromArrayBuffer, fromBlob  } from &quot;geotiff&quot;;
+
+const lerp = (a, b, t) => (1 - t) * a + t * b;
+
+function transform(a, b, M, roundToInt = false) {
+  const round = (v) => (roundToInt ? v | 0 : v);
+  return [
+    round(M[0] + M[1] * a + M[2] * b),
+    round(M[3] + M[4] * a + M[5] * b),
+  ];
+}
+
+// Load our data tile from url, arraybuffer, or blob, so we can work with it:
+const tiff = await fromArrayBuffer(...);
+const image = await tiff.getImage(); // by default, the first image is read.
+
+// Construct the WGS-84 forward and inverse affine matrices:
+const { ModelPixelScale: s, ModelTiepoint: t } = image.fileDirectory;
+let [sx, sy, sz] = s;
+let [px, py, k, gx, gy, gz] = t;
+sy = -sy; // WGS-84 tiles have a &quot;flipped&quot; y component
+
+const pixelToGPS = [gx, sx, 0, gy, 0, sy];
+console.log(`pixel to GPS transform matrix:`, pixelToGPS);
+
+const gpsToPixel = [-gx / sx, 1 / sx, 0, -gy / sy, 0, 1 / sy];
+console.log(`GPS to pixel transform matrix:`, gpsToPixel);
+
+// Convert a GPS coordinate to a pixel coordinate in our tile:
+const [gx1, gy1, gx2, gy2] = image.getBoundingBox();
+const lat = lerp(gy1, gy2, Math.random());
+const long = lerp(gx1, gx2, Math.random());
+console.log(`Looking up GPS coordinate (${lat.toFixed(6)},${long.toFixed(6)})`);
+
+const [x, y] = transform(long, lat, gpsToPixel, true);
+console.log(`Corresponding tile pixel coordinate: [${x}][${y}]`);
+
+// And as each pixel in the tile covers a geographic area, not a single
+// GPS coordinate, get the area that this pixel covers:
+const gpsBBox = [transform(x, y, pixelToGPS), transform(x + 1, y + 1, pixelToGPS)];
+console.log(`Pixel covers the following GPS area:`, gpsBBox);
+
+// Finally, retrieve the elevation associated with this pixel's geographic area:
+const rasters = await image.readRasters();
+const { width, [0]: raster } = rasters;
+const elevation = raster[x + y * width];
+console.log(`The elevation at (${lat.toFixed(6)},${long.toFixed(6)}) is ${elevation}m`);
+</code></pre>
+<h2>Advanced Example Usage</h2>
+<p>For more advanced examples of <code>geotiff</code> in larger codebases, please have a look at the following projects:</p>
 <ul>
 <li><a href="http://www.youtube.com/watch?v=E6kFLtKgeJ8">Slice view using Cesium.js (TAMP project)</a></li>
 </ul>
@@ -100,7 +156,7 @@
 <ul>
 <li><a href="https://bl.ocks.org/mbostock/83c0be21dba7602ee14982b020b12f51">Contour generation using d3-contour</a></li>
 </ul>
-<p><a href="https://bl.ocks.org/mbostock/83c0be21dba7602ee14982b020b12f51"><img src="https://pbs.twimg.com/card_img/850410549196271616/ZKcdfREH?format=jpg&amp;name=600x314" alt="contour"></a></p>
+<p><a href="https://bl.ocks.org/mbostock/83c0be21dba7602ee14982b020b12f51"><img src="https://user-images.githubusercontent.com/482265/112866402-0b219880-90ba-11eb-9dda-5f1d9ed9bafc.jpg" alt="contour"></a></p>
 <h2>Setup</h2>
 <p>To setup the repository do the following steps:</p>
 <pre class="prettyprint source lang-bash"><code># clone repo
@@ -134,7 +190,7 @@ cd -
 <p>To do some in-browser testing do:</p>
 <pre class="prettyprint source lang-bash"><code>npm run dev
 </code></pre>
-<p>and navigate to <code>http://localhost:8090/index.html</code></p>
+<p>and navigate to <code>http://localhost:8090/test/</code></p>
 <p>To build the library do:</p>
 <pre class="prettyprint source lang-bash"><code>npm run build
 </code></pre>
@@ -146,7 +202,6 @@ cd -
 <p>or you can use the prebuilt version with a CDN:</p>
 <pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://cdn.jsdelivr.net/npm/geotiff&quot;>&lt;/script>
 </code></pre>
-<p>Note: Currently the CDN installation is not compatible with GeoTIFF workers pool <code>GeoTIFF.Pool</code>.</p>
 <h2>Usage</h2>
 <p>geotiff.js works with both <code>require</code>, <code>import</code> and the global variable <code>GeoTIFF</code>:</p>
 <pre class="prettyprint source lang-javascript"><code>const GeoTIFF = require('geotiff');
@@ -156,10 +211,9 @@ const { fromUrl, fromUrls, fromArrayBuffer, fromBlob } = GeoTIFF;
 import GeoTIFF, { fromUrl, fromUrls, fromArrayBuffer, fromBlob } from 'geotiff';
 </code></pre>
 <p>or:</p>
-<pre class="prettyprint source lang-html"><code>&lt;script async src=&quot;https://cdn.jsdelivr.net/npm/geotiff&quot;>&lt;/script>
+<pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://cdn.jsdelivr.net/npm/geotiff&quot;>&lt;/script>
 &lt;script>
   console.log(GeoTIFF);
-  // Note: GeoTIFF.Pool will not work
 &lt;/script>
 </code></pre>
 <p>To parse a GeoTIFF, first a data source is required. To help with the development,
@@ -187,7 +241,7 @@ const tiff = await fromArrayBuffer(arrayBuffer);
 <p>or a <code>Blob</code>/<code>File</code>:</p>
 <pre class="prettyprint source lang-html"><code>&lt;input type=&quot;file&quot; id=&quot;file&quot;>
 &lt;script>
-  const input = document.getElementById('file'):
+  const input = document.getElementById('file');
   input.onchange = async function() {
     const tiff = await fromBlob(input.files[0]);
   }
@@ -266,23 +320,6 @@ const data = await image.readRasters({ pool });
 </code></pre>
 <p>It is possible to provide a pool size (i.e: number of workers), by default the number
 of available processors is used.</p>
-<p>Because of the way WebWorker work (pun intended), there is a considerable overhead
-involved when using the <code>Pool</code>, as all the data must be copied and cannot be simply be
-shared. But the benefits are two-fold. First: for larger image reads the overall time
-is still likely to be reduced and second: the main thread is relieved which helps to
-uphold responsiveness.</p>
-<p>If you want to use the Worker Pool in a project built with webpack (ex: VueJS or React) you have to install <code>threads-plugin</code> and add the plugin to your <code>webpack.config.js</code>:</p>
-<pre class="prettyprint source"><code>npm install -D threads-plugin
-</code></pre>
-<pre class="prettyprint source lang-javascript"><code>const ThreadsPlugin = require('threads-plugin')
-
-module.exports = {
-  // ...
-  plugins: [
-    new ThreadsPlugin()
-  ]
-}
-</code></pre>
 <h3>Dealing with visual data</h3>
 <p>The TIFF specification provides various ways to encode visual data. In the
 specification this is called photometric interpretation. The simplest case we
@@ -290,7 +327,7 @@ already dealt with is the RGB one. Others are grayscale, paletted images, CMYK,
 YCbCr, and CIE L<em>a</em>b.</p>
 <p>geotiff.js provides a method to automatically convert these images to RGB:
 <code>readRGB()</code>. This method is very similar to the <code>readRasters</code> method with
-distinction that the <code>interleave</code> option is now always <code>true</code> and the
+the distinction that the <code>interleave</code> option now defaults to <code>true</code> and the
 <code>samples</code> are automatically chosen.</p>
 <pre class="prettyprint source lang-javascript"><code>const rgb = await image.readRGB({
   // options...
@@ -324,6 +361,20 @@ factory function:</p>
   ['LC08_L1TP_189027_20170403_20170414_01_T1_B3.TIF.ovr']
 );
 </code></pre>
+<h3>AbortController Support</h3>
+<p>Geotiff.js supports the use of <a href="https://developer.mozilla.org/en-US/docs/Web/API/AbortController"><code>AbortController</code>s</a>. Calls to <code>getRasters</code>, <code>readRGB</code> and <code>getTileOrStrip</code> will throw an <code>Error</code> with name <code>AbortSignal</code> similar to the browser's <code>fetch</code> behavior.</p>
+<pre class="prettyprint source lang-javascript"><code>const tiff = await fromUrl(source);
+const abortController = new AbortController();
+const { signal } = abortController;
+abortController.abort();
+try {
+  const data = await tiff.readRasters({ signal });
+} catch(e) {
+  if (err.name === 'AbortError') {
+    // do stuff
+  }
+}
+</code></pre>
 <h3>Writing GeoTIFFs (Beta Version)</h3>
 <p>You can create a binary representation of a GeoTIFF using <code>writeArrayBuffer</code>.
 This function returns an ArrayBuffer which you can then save as a .tif file.
@@ -342,6 +393,7 @@ const arrayBuffer = await writeArrayBuffer(values, metadata);
 
 const values = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const metadata = {
+  GeographicTypeGeoKey: 4326,
   height: 3,
   ModelPixelScale: [0.031355, 0.031355, 0],
   ModelTiepoint: [0, 0, 0, 11.331755000000001, 46.268645, 0],
@@ -375,6 +427,7 @@ on the fly rendering of the data contained in a GeoTIFF.</p>
   })();
 &lt;/script>
 </code></pre>
+<p>There's also a library called <a href="https://github.com/matafokka/geotiff-geokeys-to-proj4">geotiff-geokeys-to-proj4</a>, that allows for reprojecting pixel coordinates and, therefore, consuming geospatial data contained in GeoTIFF.</p>
 <h2>BigTIFF support</h2>
 <p>geotiff.js has a limited support for files in the BigTIFF format. The limitations
 originate in the capabilities of current JavaScript implementations regarding
@@ -390,15 +443,21 @@ might be inaccuracies for <em>very</em> large values.</li>
 cause problems for some compression algorithms if those arrays are used for
 pixel values.</li>
 </ul>
+<h2>n-bit Support</h2>
+<p>geotiff.js has some n-bit support which means that it supports unsigned integer
+data reading with each element using a non-multiple of 8 bit depth. This only
+works with band interleaved images (see
+<a href="https://github.com/geotiffjs/geotiff.js/issues/202">this related issue</a>).</p>
 <h2>Planned stuff:</h2>
 <ul>
 <li>Better support of geospatial parameters:
 <ul>
-<li>Parsing of EPSG identifiers</li>
 <li>WKT representation</li>
 </ul>
 </li>
 </ul>
+<h2>Known Issues</h2>
+<p>The open issues can be found on <a href="https://github.com/geotiffjs/geotiff.js/issues">GitHub</a>.</p>
 <h2>Contribution</h2>
 <p>If you have an idea, found a bug or have a remark, please open a ticket, we will
 look into it ASAP.</p>
@@ -420,13 +479,13 @@ which is the aim of geotiff.js.</p></article>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-pool.html">pool</a></li><li><a href="module-resample.html">resample</a></li><li><a href="module-source.html">source</a></li></ul><h3>Classes</h3><ul><li><a href="DummyLogger.html">DummyLogger</a></li><li><a href="GeoTIFF.html">GeoTIFF</a></li><li><a href="GeoTIFFImage.html">GeoTIFFImage</a></li><li><a href="GeoTIFFImageIndexError.html">GeoTIFFImageIndexError</a></li><li><a href="ImageFileDirectory.html">ImageFileDirectory</a></li><li><a href="module-pool-Pool.html">Pool</a></li><li><a href="module-source-BlockedSource.html">BlockedSource</a></li><li><a href="MultiGeoTIFF.html">MultiGeoTIFF</a></li></ul><h3>Interfaces</h3><ul><li><a href="Source.html">Source</a></li></ul><h3>Global</h3><ul><li><a href="global.html#fromArrayBuffer">fromArrayBuffer</a></li><li><a href="global.html#fromBlob">fromBlob</a></li><li><a href="global.html#fromFile">fromFile</a></li><li><a href="global.html#fromUrl">fromUrl</a></li><li><a href="global.html#fromUrls">fromUrls</a></li><li><a href="global.html#setLogger">setLogger</a></li><li><a href="global.html#writeArrayBuffer">writeArrayBuffer</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-geotiff.html">geotiff</a></li><li><a href="module-geotiffimage.html">geotiffimage</a></li><li><a href="module-pool.html">pool</a></li><li><a href="module-resample.html">resample</a></li></ul><h3>Classes</h3><ul><li><a href="ArrayBufferSource.html">ArrayBufferSource</a></li><li><a href="BaseClient.html">BaseClient</a></li><li><a href="BaseResponse.html">BaseResponse</a></li><li><a href="BaseSource.html">BaseSource</a></li><li><a href="Block.html">Block</a></li><li><a href="BlockedSource.html">BlockedSource</a></li><li><a href="BlockedSource_BlockedSource.html">BlockedSource</a></li><li><a href="BlockGroup.html">BlockGroup</a></li><li><a href="CustomAggregateError.html">CustomAggregateError</a></li><li><a href="DummyLogger.html">DummyLogger</a></li><li><a href="FetchClient.html">FetchClient</a></li><li><a href="FetchResponse.html">FetchResponse</a></li><li><a href="FileReaderSource.html">FileReaderSource</a></li><li><a href="FileSource.html">FileSource</a></li><li><a href="HttpClient.html">HttpClient</a></li><li><a href="HttpResponse.html">HttpResponse</a></li><li><a href="JpegStreamReader.html">JpegStreamReader</a></li><li><a href="module.exports.html">exports</a></li><li><a href="module-geotiffimage-GeoTIFFImage.html">GeoTIFFImage</a></li><li><a href="module-geotiff-GeoTIFF.html">GeoTIFF</a></li><li><a href="module-geotiff-GeoTIFFBase.html">GeoTIFFBase</a></li><li><a href="module-geotiff-GeoTIFFImageIndexError.html">GeoTIFFImageIndexError</a></li><li><a href="module-geotiff-ImageFileDirectory.html">ImageFileDirectory</a></li><li><a href="module-geotiff-MultiGeoTIFF.html">MultiGeoTIFF</a></li><li><a href="module-pool-Pool.html">Pool</a></li><li><a href="module-pool-WorkerWrapper.html">WorkerWrapper</a></li><li><a href="RemoteSource.html">RemoteSource</a></li><li><a href="XHRClient.html">XHRClient</a></li><li><a href="XHRResponse.html">XHRResponse</a></li></ul><h3>Global</h3><ul><li><a href="global.html#addDecoder">addDecoder</a></li><li><a href="global.html#getDecoder">getDecoder</a></li><li><a href="global.html#makeFileReaderSource">makeFileReaderSource</a></li><li><a href="global.html#makeRemoteSource">makeRemoteSource</a></li><li><a href="global.html#parseByteRanges">parseByteRanges</a></li><li><a href="global.html#parseContentRange">parseContentRange</a></li><li><a href="global.html#parseContentType">parseContentType</a></li><li><a href="global.html#parseHeaders">parseHeaders</a></li><li><a href="global.html#preferWorker">preferWorker</a></li><li><a href="global.html#registerTag">registerTag</a></li><li><a href="global.html#setLogger">setLogger</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.4</a> on Sun Feb 21 2021 00:00:46 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Sep 15 2025 16:58:45 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

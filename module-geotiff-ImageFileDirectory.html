@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: DummyLogger</title>
+    <title>JSDoc: Class: ImageFileDirectory</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: DummyLogger</h1>
+    <h1 class="page-title">Class: ImageFileDirectory</h1>
 
     
 
@@ -28,9 +28,11 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>DummyLogger<span class="signature">()</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>
+            <span class="ancestors"><a href="module-geotiff.html">geotiff</a>~</span>ImageFileDirectory<span class="signature">(fileDirectory, rawFileDirectory, geoKeyDirectory, nextIFDByteOffset)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description"><p>A no-op logger</p></div>
+            <div class="class-description"><p>Data class to store the parsed file directory (+ its raw form), geo key directory and
+offset to the next IFD</p></div>
         
     
 </header>
@@ -45,19 +47,141 @@
     
 
     
-    <h4 class="name" id="DummyLogger"><span class="type-signature"></span>new DummyLogger<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="ImageFileDirectory"><span class="type-signature"></span>new ImageFileDirectory<span class="signature">(fileDirectory, rawFileDirectory, geoKeyDirectory, nextIFDByteOffset)</span><span class="type-signature"></span></h4>
     
 
     
 
 
 
+<div class="description">
+    <p>Create an ImageFileDirectory.</p>
+</div>
 
 
 
 
 
 
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>fileDirectory</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>the file directory, mapping tag names to values</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>rawFileDirectory</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Map</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>the raw file directory, mapping tag IDs to values</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>geoKeyDirectory</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>the geo key directory, mapping geo key names to values</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>nextIFDByteOffset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>the byte offset to the next IFD</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -93,7 +217,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="logging.js.html">logging.js</a>, <a href="logging.js.html#line4">line 4</a>
+        <a href="geotiff.js.html">geotiff.js</a>, <a href="geotiff.js.html#line181">line 181</a>
     </li></ul></dd>
     
 
